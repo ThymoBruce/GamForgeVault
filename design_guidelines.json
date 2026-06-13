@@ -1,0 +1,103 @@
+{
+  "theme": "dark",
+  "archetype": "5",
+  "archetype_name": "Luxury / Moody Dark (Steam-like)",
+  "colors": {
+    "background": "#0A0A0A",
+    "surface": "#121212",
+    "surface_hover": "#1A1A1A",
+    "primary": "#007AFF",
+    "primary_hover": "#3395FF",
+    "secondary": "#2A475E",
+    "accent": "#FF3B30",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#8B9BB4",
+    "border": "rgba(255, 255, 255, 0.08)",
+    "status": {
+      "playing": "#007AFF",
+      "completed": "#34C759",
+      "dropped": "#FF3B30",
+      "backlog": "#8B9BB4"
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "IBM Plex Sans",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl tracking-tighter font-black leading-tight",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "h4": "text-lg sm:text-xl font-semibold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm tracking-wide",
+      "overline": "text-xs uppercase tracking-[0.2em]"
+    }
+  },
+  "spacing": {
+    "generous": "p-8 md:p-12",
+    "standard": "p-6",
+    "tight": "p-4",
+    "gap_large": "gap-8",
+    "gap_standard": "gap-6",
+    "gap_tight": "gap-4"
+  },
+  "layout": {
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "bento_hero": "grid grid-cols-1 md:grid-cols-8 gap-8",
+    "alignment": "Mobile-first, optical alignment, left-aligned dense content"
+  },
+  "components": {
+    "cards": {
+      "style": "bg-[#121212] border border-white/10 rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:border-white/20 hover:shadow-lg hover:shadow-black/50",
+      "padding": "p-6"
+    },
+    "buttons": {
+      "primary": "bg-[#007AFF] text-white font-bold px-6 py-3 rounded-lg transition-all hover:bg-[#3395FF] hover:-translate-y-0.5",
+      "secondary": "bg-[#1A1A1A] text-white border border-white/10 px-6 py-3 rounded-lg transition-all hover:bg-[#2A2A2A]",
+      "ghost": "bg-transparent text-gray-400 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg transition-all"
+    },
+    "inputs": {
+      "style": "bg-[#0A0A0A] border border-white/10 rounded-md px-4 py-3 focus:ring-2 focus:ring-[#007AFF] focus:border-transparent text-white transition-all w-full"
+    },
+    "navigation": {
+      "style": "sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10"
+    },
+    "badges": {
+      "style": "px-2 py-1 rounded-md text-xs font-bold tracking-wider uppercase bg-white/10 text-white border border-white/5"
+    }
+  },
+  "motion": {
+    "hover": "transition-all duration-200 ease-in-out",
+    "page_enter": "animate-in fade-in slide-in-from-bottom-4 duration-500",
+    "list_stagger": "staggered entrance for game cards using framer-motion or simple CSS delays"
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "stroke-2"
+  },
+  "images": {
+    "hero_backgrounds": [
+      "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80"
+    ],
+    "game_covers_placeholders": [
+      "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: Follow the exact colors and spacing defined in this JSON. Do not default to Tailwind's slate or Vercel's black/white themes.",
+    "Implement the 'Control Room Grid' for the main dashboard and game catalog (gap-6, full utilization of pixels, h-full on children).",
+    "Ensure all interactive elements and key text have data-testid attributes (e.g., data-testid='login-submit-button').",
+    "For the header, use a sticky glassmorphism style (backdrop-blur-xl bg-[#0A0A0A]/80).",
+    "Include <link href='https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Outfit:wght@300;400;600;800;900&display=swap' rel='stylesheet'> in index.html.",
+    "Add 'Outfit' and 'IBM Plex Sans' to tailwind.config.js font families.",
+    "Do not use generic full-screen gradients; use solid dark backgrounds (#0A0A0A) with subtle white/10 borders to create depth.",
+    "For hover states, always explicitly define the text color.",
+    "For the My Catalog view, ensure image covers don't exceed 80vh on mobile, use grid layouts with card hover animations.",
+    "Use Shadcn UI components but heavily customize them. Strip standard Shadcn generic looks and apply the 'cards.style' rules.",
+    "Use Sonner for toast notifications. Do NOT use HTML input type='date' or <select>—use Shadcn equivalents.",
+    "Build a separate View for My Catalog, Add Game flows (Barcode Scanner, RAWG search, Manual), and Gaming Journal.",
+    "Ensure mobile barcode scanner UI is fully responsive and full-screen camera view."
+  ]
+}
