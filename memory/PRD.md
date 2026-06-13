@@ -28,6 +28,13 @@ Build a comprehensive, modern Game Collection Catalog web application with auth 
 - Mobile menu drawer (Radix Sheet) with a11y title/description.
 - Responsive layout, sticky glassmorphism mobile top bar, Steam-inspired moody dark theme.
 
+## What's been implemented (2026-02-13 — Iteration 2)
+- `/reset-password?token=…` page wired to existing backend endpoint (validates token, confirm-password UX).
+- Friend activity feed (`GET /api/activity/feed`) surfaced on the Dashboard (recent friend additions + sessions).
+- CSV import (`POST /api/import/games-csv`) and export (`GET /api/export/games.csv`) on the Catalog page; works in Dev Mode against localStorage too.
+- PWA: `/manifest.json` (standalone, theme-color, SVG icon) + minimal `/sw.js` service worker (registers only in production; same-origin cache; API never cached).
+- GameDetail gallery: per-photo remove button (hover) + full-screen Lightbox (keyboard arrow nav, prev/next, counter) + cover-image lightbox.
+
 ## Backlog / Next Tasks
 - **P1**: Steam integration (SteamID64 import) — skipped per user (no API key yet). Reintroduce when key provided.
 - **P1**: Reset-password page (`/reset-password?token=…`) UI – endpoint exists, no UI yet.
