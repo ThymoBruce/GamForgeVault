@@ -3,7 +3,8 @@ import { NavLink, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Gamepad2, LayoutDashboard, Library, Plus, BookOpen, Users, LogOut, User, Menu } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", testId: "nav-dashboard" },
@@ -103,6 +104,7 @@ export default function Layout({ children }) {
                 </button>
               </SheetTrigger>
               <SheetContent side="right" className="bg-[#0A0A0A] border-l border-white/10 text-white w-72 p-4" data-testid="mobile-menu-drawer">
+                <VisuallyHidden><SheetTitle>Navigation menu</SheetTitle><SheetDescription>Main app navigation links</SheetDescription></VisuallyHidden>
                 <SidebarContent onNavigate={() => setOpen(false)} />
               </SheetContent>
             </Sheet>
