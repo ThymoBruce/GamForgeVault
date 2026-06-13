@@ -1,0 +1,18 @@
+{
+  "short_name": "GameVault",
+  "name": "GameVault — Your Game Collection",
+  "description": "Modern dark-mode game collection catalog with barcode scanning, RAWG search, journals, friends.",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23007AFF'/><g fill='white'><path d='M48 96a24 24 0 0124-24h48a24 24 0 0124 24v0a24 24 0 01-24 24H72a24 24 0 01-24-24z'/><circle cx='128' cy='96' r='8'/><rect x='60' y='90' width='16' height='4' rx='2'/><rect x='66' y='84' width='4' height='16' rx='2'/></g></svg>",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#007AFF",
+  "background_color": "#0A0A0A"
+}

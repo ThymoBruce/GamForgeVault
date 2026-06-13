@@ -676,6 +676,122 @@ async def user_games(user_id: str, user: dict = Depends(get_current_user)):
     games = await db.games.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(1000)
     return {"user": target, "games": games}
 
+# -------- Friend Activity Feed --------
+@api_router.get("/activity/feed")
+async def activity_feed(user: dict = Depends(get_current_user), limit: int = 30):
+    rels = await db.friendships.find(
+        {"$or": [{"user_a": user["user_id"]}, {"user_b": user["user_id"]}]}, {"_id": 0}
+    ).to_list(1000)
+    friend_ids = [r["user_b"] if r["user_a"] == user["user_id"] else r["user_a"] for r in rels]
+    if not friend_ids:
+        return []
+    users = await db.users.find({"user_id": {"$in": friend_ids}}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    umap = {u["user_id"]: u for u in users}
+    # Recent games added by friends
+    recent_games = await db.games.find(
+        {"user_id": {"$in": friend_ids}}, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    recent_sessions = await db.gameplay_sessions.find(
+        {"user_id": {"$in": friend_ids}}, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    game_ids = list({s["game_id"] for s in recent_sessions})
+    sgames = await db.games.find({"game_id": {"$in": game_ids}}, {"_id": 0}).to_list(1000) if game_ids else []
+    sgmap = {g["game_id"]: g for g in sgames}
+    events = []
+    for g in recent_games:
+        events.append({
+            "type": "added",
+            "ts": g.get("created_at", ""),
+            "user": umap.get(g["user_id"]),
+            "game": g,
+        })
+    for s in recent_sessions:
+        events.append({
+            "type": "session",
+            "ts": s.get("created_at", ""),
+            "user": umap.get(s["user_id"]),
+            "session": s,
+            "game": sgmap.get(s["game_id"]),
+        })
+    events.sort(key=lambda e: e["ts"], reverse=True)
+    return events[:limit]
+
+# -------- CSV Import / Export --------
+import csv
+import io as _io
+
+CSV_HEADERS = ["title", "platform", "release_year", "genre", "cover_url", "status", "rating", "review", "barcode"]
+
+@api_router.get("/export/games.csv")
+async def export_csv(user: dict = Depends(get_current_user)):
+    cur = db.games.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1)
+    games = await cur.to_list(5000)
+    buf = _io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=CSV_HEADERS, extrasaction="ignore")
+    writer.writeheader()
+    for g in games:
+        writer.writerow({h: g.get(h, "") if g.get(h) is not None else "" for h in CSV_HEADERS})
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="gamevault-catalog.csv"'},
+    )
+
+@api_router.post("/import/games-csv")
+async def import_csv(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="CSV file required")
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    reader = csv.DictReader(_io.StringIO(text))
+    created = 0
+    skipped = 0
+    errors = []
+    for idx, row in enumerate(reader, start=2):
+        title = (row.get("title") or "").strip()
+        platform = (row.get("platform") or "").strip()
+        if not title or not platform:
+            skipped += 1
+            errors.append({"row": idx, "error": "Missing title or platform"})
+            continue
+        year_raw = (row.get("release_year") or "").strip()
+        try:
+            year = int(year_raw) if year_raw else None
+        except ValueError:
+            year = None
+        rating_raw = (row.get("rating") or "").strip()
+        try:
+            rating = int(rating_raw) if rating_raw else None
+        except ValueError:
+            rating = None
+        status = (row.get("status") or "Backlog").strip() or "Backlog"
+        if status not in ("Backlog", "Playing", "Completed", "100% Completed", "Dropped"):
+            status = "Backlog"
+        game_id = f"game_{uuid.uuid4().hex[:12]}"
+        doc = {
+            "game_id": game_id,
+            "user_id": user["user_id"],
+            "title": title,
+            "platform": platform,
+            "release_year": year,
+            "genre": (row.get("genre") or "").strip() or None,
+            "cover_url": (row.get("cover_url") or "").strip() or None,
+            "status": status,
+            "rating": rating,
+            "review": (row.get("review") or "").strip() or None,
+            "barcode": (row.get("barcode") or "").strip() or None,
+            "gallery": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.games.insert_one(doc)
+        created += 1
+    return {"created": created, "skipped": skipped, "errors": errors[:20]}
+
 # -------- Stats --------
 @api_router.get("/stats")
 async def stats(user: dict = Depends(get_current_user)):

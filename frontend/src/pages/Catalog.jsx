@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { makeService } from "@/lib/service";
+import { api, API } from "@/lib/api";
 import GameCard from "@/components/GameCard";
 import { Link } from "react-router-dom";
-import { Plus, Filter } from "lucide-react";
+import { Plus, Filter, Download, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUSES = ["Backlog", "Playing", "Completed", "100% Completed", "Dropped"];
@@ -24,18 +26,94 @@ export default function Catalog() {
   const [year, setYear] = useState("");
   const [sort, setSort] = useState("created_desc");
   const [loading, setLoading] = useState(false);
+  const fileRef = useRef(null);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const params = {};
-      if (status !== "all") params.status = status;
-      if (platform) params.platform = platform;
-      if (year) params.year = Number(year);
-      params.sort = sort;
-      try { setGames(await svc.listGames(params)); } finally { setLoading(false); }
-    })();
-  }, [svc, status, platform, year, sort]);
+  const fetchGames = async () => {
+    setLoading(true);
+    const params = {};
+    if (status !== "all") params.status = status;
+    if (platform) params.platform = platform;
+    if (year) params.year = Number(year);
+    params.sort = sort;
+    try { setGames(await svc.listGames(params)); } finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchGames(); /* eslint-disable-next-line */ }, [svc, status, platform, year, sort]);
+
+  const exportCsv = async () => {
+    if (devMode) {
+      const rows = await svc.listGames();
+      const headers = ["title","platform","release_year","genre","cover_url","status","rating","review","barcode"];
+      const csv = [headers.join(",")].concat(
+        rows.map((g) => headers.map((h) => `"${String(g[h] ?? "").replace(/"/g, '""')}"`).join(","))
+      ).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "gamevault-catalog.csv"; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Exported");
+      return;
+    }
+    try {
+      const res = await api.get("/export/games.csv", { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a"); a.href = url; a.download = "gamevault-catalog.csv"; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Exported");
+    } catch { toast.error("Export failed"); }
+  };
+
+  const importCsv = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    if (devMode) {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (lines.length < 2) { toast.error("CSV is empty"); return; }
+      const parseLine = (line) => {
+        const out = []; let cur = ""; let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQ) {
+            if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
+            else if (ch === '"') inQ = false;
+            else cur += ch;
+          } else {
+            if (ch === ',') { out.push(cur); cur = ""; }
+            else if (ch === '"') inQ = true;
+            else cur += ch;
+          }
+        }
+        out.push(cur); return out;
+      };
+      const headers = parseLine(lines[0]);
+      let created = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cells = parseLine(lines[i]);
+        const row = {}; headers.forEach((h, idx) => { row[h] = cells[idx] || ""; });
+        if (!row.title || !row.platform) continue;
+        await svc.createGame({
+          title: row.title, platform: row.platform,
+          release_year: row.release_year ? Number(row.release_year) : null,
+          genre: row.genre || null, cover_url: row.cover_url || null,
+          status: row.status || "Backlog",
+          rating: row.rating ? Number(row.rating) : null,
+          review: row.review || null, barcode: row.barcode || null,
+        });
+        created++;
+      }
+      toast.success(`Imported ${created} games`);
+      fetchGames();
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const { data } = await api.post("/import/games-csv", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      toast.success(`Imported ${data.created} games (${data.skipped} skipped)`);
+      fetchGames();
+    } catch { toast.error("Import failed"); }
+    finally { if (fileRef.current) fileRef.current.value = ""; }
+  };
 
   return (
     <div className="space-y-8" data-testid="catalog-root">
@@ -45,7 +123,14 @@ export default function Catalog() {
           <h1 className="font-heading font-black text-4xl sm:text-5xl tracking-tighter">My Catalog</h1>
           <p className="text-[#8B9BB4] mt-2">{games.length} {games.length === 1 ? "title" : "titles"}</p>
         </div>
-        <Link to="/add" className="gv-btn-primary self-start" data-testid="catalog-add-game"><Plus size={16} /> Add Game</Link>
+        <div className="flex flex-wrap gap-2 self-start">
+          <button onClick={exportCsv} data-testid="export-csv-button" className="gv-btn-secondary"><Download size={14} /> Export CSV</button>
+          <label className="gv-btn-secondary cursor-pointer" data-testid="import-csv-label">
+            <Upload size={14} /> Import CSV
+            <input ref={fileRef} data-testid="import-csv-input" type="file" accept=".csv" className="hidden" onChange={importCsv} />
+          </label>
+          <Link to="/add" className="gv-btn-primary" data-testid="catalog-add-game"><Plus size={16} /> Add Game</Link>
+        </div>
       </div>
 
       <div className="gv-card p-5 grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="catalog-filters">

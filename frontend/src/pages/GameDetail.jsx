@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { makeService } from "@/lib/service";
-import { ArrowLeft, Trash2, Save, Upload, Plus, Clock } from "lucide-react";
+import { ArrowLeft, Trash2, Save, Upload, Plus, Clock, X as XIcon, Expand } from "lucide-react";
 import StarRating from "@/components/StarRating";
+import Lightbox from "@/components/Lightbox";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -18,6 +19,15 @@ export default function GameDetail() {
   const [sessions, setSessions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [sessionForm, setSessionForm] = useState({ date: new Date().toISOString().slice(0, 10), duration_minutes: 60, notes: "" });
+  const [lightbox, setLightbox] = useState({ open: false, start: 0 });
+  const [coverLightbox, setCoverLightbox] = useState(false);
+
+  const removePhoto = async (i) => {
+    if (!window.confirm("Remove this photo?")) return;
+    const gallery = [...(game.gallery || [])];
+    gallery.splice(i, 1);
+    await update({ gallery });
+  };
 
   const load = async () => {
     try {
@@ -73,9 +83,17 @@ export default function GameDetail() {
       <Link to="/catalog" className="gv-btn-ghost" data-testid="back-to-catalog"><ArrowLeft size={16} />Back to catalog</Link>
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-1">
-          <div className="aspect-[3/4] gv-card overflow-hidden">
-            <img src={game.cover_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=600&q=80"} alt="" className="w-full h-full object-cover" />
-          </div>
+          <button
+            type="button"
+            data-testid="cover-expand-button"
+            onClick={() => game.cover_url && setCoverLightbox(true)}
+            className="aspect-[3/4] gv-card overflow-hidden block w-full group relative"
+          >
+            <img src={game.cover_url || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=600&q=80"} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            {game.cover_url && (
+              <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><Expand size={14} /></span>
+            )}
+          </button>
         </div>
         <div className="md:col-span-2 space-y-6">
           <div>
@@ -112,10 +130,24 @@ export default function GameDetail() {
                 <input data-testid="upload-photo-input" type="file" accept="image/*" className="hidden" onChange={onUpload} />
               </label>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3" data-testid="gallery-grid">
               {(game.gallery || []).map((url, i) => (
-                <div key={i} className="aspect-square bg-[#1A1A1A] rounded-lg overflow-hidden border border-white/10">
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                <div key={i} className="aspect-square bg-[#1A1A1A] rounded-lg overflow-hidden border border-white/10 relative group" data-testid={`gallery-item-${i}`}>
+                  <button
+                    type="button"
+                    data-testid={`gallery-open-${i}`}
+                    onClick={() => setLightbox({ open: true, start: i })}
+                    className="w-full h-full block"
+                  >
+                    <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`gallery-remove-${i}`}
+                    onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
+                    className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 backdrop-blur-md text-[#FF3B30] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#FF3B30] hover:text-white"
+                    aria-label="Remove photo"
+                  ><XIcon size={14} /></button>
                 </div>
               ))}
               {(game.gallery || []).length === 0 && <div className="col-span-full text-[#8B9BB4] text-sm">No photos yet.</div>}
@@ -123,6 +155,9 @@ export default function GameDetail() {
           </div>
         </div>
       </div>
+
+      <Lightbox open={lightbox.open} onOpenChange={(v) => setLightbox((s) => ({ ...s, open: v }))} images={game.gallery || []} startIndex={lightbox.start} />
+      <Lightbox open={coverLightbox} onOpenChange={setCoverLightbox} images={game.cover_url ? [game.cover_url] : []} startIndex={0} />
 
       {game.status === "Playing" && (
         <section className="border-t border-white/10 pt-10">

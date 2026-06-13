@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { makeService } from "@/lib/service";
 import GameCard from "@/components/GameCard";
+import ActivityFeed from "@/components/ActivityFeed";
 import { Library, PlayCircle, Trophy, Clock, BookOpen, Plus } from "lucide-react";
 
 const StatCard = ({ icon: Icon, label, value, sub, testId }) => (
@@ -78,6 +79,14 @@ export default function Dashboard() {
             {recent.map((g) => <GameCard key={g.game_id} game={g} />)}
           </div>
         )}
+      </section>
+
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-heading font-bold text-2xl tracking-tight">Friend activity</h2>
+          <Link to="/friends" className="gv-btn-ghost">Manage friends →</Link>
+        </div>
+        <ActivityFeed devMode={devMode} />
       </section>
     </div>
   );
