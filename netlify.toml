@@ -4,6 +4,8 @@
   command = "npm run build"
   publish = "build"        # FIXED: Points to Create React App's default output folder
 
+[functions]
+  included_files = ["backend/**"]
 # Critical for SPAs: Redirects all routes to index.html to avoid Netlify 404s on page refresh
 [[redirects]]
   from = "/*"
