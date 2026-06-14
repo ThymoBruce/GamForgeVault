@@ -24,6 +24,7 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
 EANDATA_KEY = os.environ.get("EANDATA_API_KEY", "")
 RAWG_KEY = os.environ.get("RAWG_API_KEY", "")
+STEAM_KEY = os.environ.get("STEAM_API_KEY", "")
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 APP_NAME = os.environ.get("APP_NAME", "gamevault")
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
@@ -791,6 +792,111 @@ async def import_csv(file: UploadFile = File(...), user: dict = Depends(get_curr
         await db.games.insert_one(doc)
         created += 1
     return {"created": created, "skipped": skipped, "errors": errors[:20]}
+
+# -------- Steam Import --------
+class SteamImportIn(BaseModel):
+    steam_id: str
+
+def steam_cover_url(appid: int) -> str:
+    return f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900_2x.jpg"
+
+@api_router.post("/integrations/steam/import")
+async def steam_import(body: SteamImportIn, user: dict = Depends(get_current_user)):
+    if not STEAM_KEY:
+        raise HTTPException(status_code=500, detail="Steam API key not configured")
+    sid = body.steam_id.strip()
+    if not sid.isdigit() or not (16 <= len(sid) <= 18):
+        raise HTTPException(status_code=400, detail="Invalid SteamID64")
+    try:
+        r = requests.get(
+            "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/",
+            params={"key": STEAM_KEY, "steamid": sid, "include_appinfo": "true", "include_played_free_games": "true", "format": "json"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        payload = r.json().get("response", {})
+    except Exception as e:
+        logger.error(f"Steam import failed: {e}")
+        raise HTTPException(status_code=502, detail="Steam API request failed")
+    games = payload.get("games") or []
+    if not games:
+        return {"imported": 0, "skipped": 0, "message": "No games found. Make sure your Steam profile and game library are public."}
+    # Existing steam_appids for this user (avoid duplicates)
+    existing = await db.games.find({"user_id": user["user_id"], "steam_appid": {"$ne": None}}, {"_id": 0, "steam_appid": 1}).to_list(5000)
+    existing_ids = {g.get("steam_appid") for g in existing}
+    imported = 0; skipped = 0
+    now = datetime.now(timezone.utc).isoformat()
+    for g in games:
+        appid = g.get("appid")
+        if not appid or appid in existing_ids:
+            skipped += 1
+            continue
+        playtime = int(g.get("playtime_forever") or 0)  # minutes
+        status = "Playing" if playtime > 0 and playtime < 60 * 30 else ("Completed" if playtime >= 60 * 30 else "Backlog")
+        doc = {
+            "game_id": f"game_{uuid.uuid4().hex[:12]}",
+            "user_id": user["user_id"],
+            "title": g.get("name") or f"Steam App {appid}",
+            "platform": "Steam (PC)",
+            "release_year": None,
+            "genre": None,
+            "cover_url": steam_cover_url(appid),
+            "status": status,
+            "rating": None,
+            "review": None,
+            "steam_appid": appid,
+            "steam_playtime_minutes": playtime,
+            "gallery": [],
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.games.insert_one(doc)
+        imported += 1
+    # save steam_id on user for next time
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"steam_id": sid}})
+    return {"imported": imported, "skipped": skipped, "total_in_steam": len(games)}
+
+# -------- Profile Update & Public Share --------
+class ProfileUpdateIn(BaseModel):
+    name: Optional[str] = None
+    steam_id: Optional[str] = None
+
+class ShareToggleIn(BaseModel):
+    enabled: bool
+
+@api_router.put("/profile")
+async def update_profile(body: ProfileUpdateIn, user: dict = Depends(get_current_user)):
+    update = {}
+    if body.name is not None: update["name"] = body.name.strip()
+    if body.steam_id is not None:
+        sid = body.steam_id.strip()
+        if sid and (not sid.isdigit() or not (16 <= len(sid) <= 18)):
+            raise HTTPException(status_code=400, detail="Invalid SteamID64")
+        update["steam_id"] = sid
+    if update:
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": update})
+    u = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0})
+    return u
+
+@api_router.post("/profile/share")
+async def toggle_share(body: ShareToggleIn, user: dict = Depends(get_current_user)):
+    if body.enabled:
+        existing = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "share_slug": 1})
+        slug = (existing or {}).get("share_slug") or secrets.token_urlsafe(8).replace("_", "").replace("-", "")[:10].lower()
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"share_slug": slug, "share_enabled": True}})
+        return {"enabled": True, "share_slug": slug}
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"share_enabled": False}})
+    return {"enabled": False}
+
+@api_router.get("/public/catalog/{slug}")
+async def public_catalog(slug: str):
+    u = await db.users.find_one({"share_slug": slug, "share_enabled": True}, {"_id": 0, "password_hash": 0, "email": 0})
+    if not u:
+        raise HTTPException(status_code=404, detail="Catalog not found or not shared")
+    games = await db.games.find({"user_id": u["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(2000)
+    # strip sensitive fields
+    safe_user = {"name": u.get("name"), "picture": u.get("picture"), "user_id": u["user_id"]}
+    return {"user": safe_user, "games": games, "count": len(games)}
 
 # -------- Stats --------
 @api_router.get("/stats")
