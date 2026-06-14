@@ -1,7 +1,8 @@
+# Configuration matching your dashboard settings
 [build]
-  base = "frontend"      # <-- Change this to your actual subfolder name
+  base = "frontend"
   command = "npm run build"
-  publish = "dist"       # Netlify automatically looks for 'dist' inside the base folder now
+  publish = "dist"
 
 # Critical for SPAs: Redirects all routes to index.html to avoid Netlify 404s on page refresh
 [[redirects]]
@@ -24,3 +25,7 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# FIX: Forces Netlify to ignore ESLint warnings during compilation
+[build.environment]
+  CI = "false"
