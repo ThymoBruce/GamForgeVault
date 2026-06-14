@@ -1,7 +1,7 @@
-# Configuration matching your dashboard settings
 [build]
+  base = "frontend"      # <-- Change this to your actual subfolder name
   command = "npm run build"
-  publish = "dist"
+  publish = "dist"       # Netlify automatically looks for 'dist' inside the base folder now
 
 # Critical for SPAs: Redirects all routes to index.html to avoid Netlify 404s on page refresh
 [[redirects]]
